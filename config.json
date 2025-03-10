@@ -1,0 +1,63 @@
+{
+    "window": {
+        "title_part": "无限暖暖",
+        "window_class": "UnrealWindow",
+        "process_exe": "X6Game-Win64-Shipping.exe"
+    },
+    "capture": {
+        "list": [ 
+            { "x_offset": 77, "y_offset": 38, "width": 204, "height": 204},
+            {"x_offset": 0, "y_offset": 0, "width": 1920, "height": 1080}
+        ],
+        "diameter": 204
+    },
+    "matching": {
+        "boundaries": [
+            {
+                "range": [5600, 4900, 6100, 6500],
+                "regions": ["huayuanzhen", "xiaoshishu"]
+            },
+            {
+                "range": [9427, 4175, 9767, 4390],
+                "regions": ["huayuanzhen", "qiyuansenlin"]
+            },
+            {
+                "range": [6540, 4290, 7450, 4520],
+                "regions": ["huayuanzhen", "weifenglvye"]
+            }
+        ],
+        "region_features": {
+            "huayuanzhen": "resources/features/huayuanzhen_features.npz",
+            "qiyuansenlin": "resources/features/qiyuansenlin_features.npz",
+            "weifenglvye": "resources/features/weifenglvye_features.npz",
+            "xiaoshishu": "resources/features/xiaoshishu_features.npz",
+            "huayanqundao": "resources/features/huayanqundao_features.npz"
+        },
+        "min_matches": 10,
+        "flann_checks": 50,
+        "match_ratio": 0.8,
+        "max_angle": 5,
+        "fixed_scale": 1.17,
+        "min_scale_ratio": 1,
+        "max_scale_ratio": 1.2
+    },
+    "templates": {
+        "configs": [
+            {
+                "name": "arrow",
+                "path": "resources/img/arrow.png",
+                "threshold": 0.97
+            },
+            {
+                "name": "no_minimap",
+                "path": "resources/img/no_minimap.png",
+                "threshold": 0.97
+            },
+            {
+                "name": "loading",
+                "path": "resources/img/loading.png",
+                "threshold": 0.98
+            }
+        ]
+    }
+}
