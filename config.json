@@ -10,6 +10,8 @@
     },
     "fishing": {
         "comment": "钓鱼相关配置",
+        "reel_key": "right_click",
+        "reel_key_comment": "收线阶段使用的键位，可以是键盘按键如'x'或'f'，或者'right_click'表示使用鼠标右键",
         "region": {
             "comment": "钓鱼进度条检测区域（基于1920x1080分辨率）",
             "x_offset": 260,

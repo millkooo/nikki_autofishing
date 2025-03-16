@@ -43,6 +43,10 @@ class AutoFishing:
         self.base_thresholds = self.config["fishing"]["thresholds"]
         print("成功加载基准阈值配置")
         
+        # 获取收线键位配置，默认为右键
+        self.reel_key = self.config["fishing"].get("reel_key", "right_click")
+        print(f"收线键位: {self.reel_key}")
+        
         # 颜色范围参数 - 用于检测钓鱼进度
         self.lower = np.array([22, 54, 250])
         self.upper = np.array([25, 88, 255])
@@ -381,9 +385,16 @@ class AutoFishing:
                 for _ in range(5):  # 每次循环点击5次，然后检查状态
                     if self.stop_flag or self.reset_flag:
                         break
-                    mouse.click_right(0.02)
+                    
+                    # 根据配置使用不同的收线方式
+                    if self.reel_key == "right_click":
+                        mouse.click_right(0.02)
+                    else:
+                        # 使用键盘按键
+                        self.input_handler.press(self.reel_key, tm=0.02)
+                    
                     self.reeling_clicks += 1
-                    print(f"---------正在右键 {self.reeling_clicks}--------")
+                    print(f"---------正在收线 {self.reeling_clicks} 次 (键位: {self.reel_key})--------")
                     time.sleep(0.03)
                 
                 # 检查是否需要重置
