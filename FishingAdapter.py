@@ -4,6 +4,7 @@ import threading
 import time
 import traceback
 import win32gui
+import json  # 添加json模块导入
 
 from PyQt5.QtCore import QObject, pyqtSignal, QTimer, Qt
 from PyQt5.QtWidgets import QMessageBox
