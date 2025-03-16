@@ -54,23 +54,11 @@ class TransparentOverlay(QMainWindow):
         # 创建中央窗口部件
         self.central_widget = QWidget(self)
         self.setCentralWidget(self.central_widget)
-
-        # 创建布局
-        self.layout = QVBoxLayout(self.central_widget)
-        self.layout.setContentsMargins(0, 0, 0, 0)  # 移除边距
-
-        # 创建标签显示位置和角度
-        self.label = QLabel("等待数据...")
-        self.label.setStyleSheet("color: white; font-size: 16px; background-color: rgba(0, 0, 0, 100);")
-        self.label.setAlignment(Qt.AlignCenter)
-        self.layout.addWidget(self.label)
-
-        # 获取屏幕分辨率并设置为全屏
+        
+        # 设置窗口大小和位置
         screen = QApplication.primaryScreen().geometry()
-        self.setGeometry(1550,250, 370, 470)
-        # 移除self.move(1550, 250)
+        self.setGeometry(1550, 250, 370, 470)
 
-    
     def find_and_follow_target(self):
         """查找并跟随目标窗口"""
         if not self.target_config:
@@ -145,36 +133,3 @@ class TransparentOverlay(QMainWindow):
         self.target_config = config
         return self.find_and_follow_target()
 
-    def update_position_info(self, position, angle, speed="0.00 px/s"):
-        """更新位置、角度和速度信息
-        
-        Args:
-            position: 位置坐标，格式为 (x, y)
-            angle: 角度值
-            speed: 速度值字符串，默认为"0.00 px/s"
-        """
-        if position:
-            self.label.setText(f"当前位置: {position}\n当前角度: {angle}°\n当前速度: {speed}")
-        else:
-            self.label.setText(f"未检测到位置\n当前角度: {angle}°\n当前速度: {speed}")
-
-# 示例用法
-def main():
-    app = QApplication(sys.argv)
-    
-    # 目标窗口配置
-    target_config = {
-        "title_part": "无限暖暖",
-        "window_class": "UnrealWindow",
-        "process_exe": "X6Game-Win64-Shipping.exe"
-    }
-    
-    # 创建透明覆盖窗口
-    overlay = TransparentOverlay(target_config)
-    overlay.show()
-    
-    sys.exit(app.exec_())
-
-
-if __name__ == "__main__":
-    main()

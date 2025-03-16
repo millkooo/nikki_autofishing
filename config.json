@@ -1,63 +1,40 @@
 {
     "window": {
+        "comment": "窗口配置 - 用于定位游戏窗口",
         "title_part": "无限暖暖",
+        "title_comment": "游戏窗口标题（部分匹配即可）",
         "window_class": "UnrealWindow",
-        "process_exe": "X6Game-Win64-Shipping.exe"
+        "class_comment": "游戏窗口的类名",
+        "process_exe": "X6Game-Win64-Shipping.exe",
+        "process_comment": "游戏进程的可执行文件名"
     },
-    "capture": {
-        "list": [ 
-            { "x_offset": 77, "y_offset": 38, "width": 204, "height": 204},
-            {"x_offset": 0, "y_offset": 0, "width": 1920, "height": 1080}
-        ],
-        "diameter": 204
-    },
-    "matching": {
-        "boundaries": [
-            {
-                "range": [5600, 4900, 6100, 6500],
-                "regions": ["huayuanzhen", "xiaoshishu"]
-            },
-            {
-                "range": [9427, 4175, 9767, 4390],
-                "regions": ["huayuanzhen", "qiyuansenlin"]
-            },
-            {
-                "range": [6540, 4290, 7450, 4520],
-                "regions": ["huayuanzhen", "weifenglvye"]
-            }
-        ],
-        "region_features": {
-            "huayuanzhen": "resources/features/huayuanzhen_features.npz",
-            "qiyuansenlin": "resources/features/qiyuansenlin_features.npz",
-            "weifenglvye": "resources/features/weifenglvye_features.npz",
-            "xiaoshishu": "resources/features/xiaoshishu_features.npz",
-            "huayanqundao": "resources/features/huayanqundao_features.npz"
+    "fishing": {
+        "comment": "钓鱼相关配置",
+        "region": {
+            "comment": "钓鱼进度条检测区域（基于1920x1080分辨率）",
+            "x_offset": 260,
+            "x_comment": "检测区域左边距",
+            "y_offset": 220,
+            "y_comment": "检测区域上边距",
+            "width": 1000,
+            "width_comment": "检测区域宽度",
+            "height": 400,
+            "height_comment": "检测区域高度"
         },
-        "min_matches": 10,
-        "flann_checks": 50,
-        "match_ratio": 0.8,
-        "max_angle": 5,
-        "fixed_scale": 1.17,
-        "min_scale_ratio": 1,
-        "max_scale_ratio": 1.2
-    },
-    "templates": {
-        "configs": [
-            {
-                "name": "arrow",
-                "path": "resources/img/arrow.png",
-                "threshold": 0.97
-            },
-            {
-                "name": "no_minimap",
-                "path": "resources/img/no_minimap.png",
-                "threshold": 0.97
-            },
-            {
-                "name": "loading",
-                "path": "resources/img/loading.png",
-                "threshold": 0.98
-            }
-        ]
+        "thresholds": {
+            "comment": "钓鱼判定阈值（基于1920x1080分辨率）",
+            "fish_hook": 200,
+            "fish_hook_comment": "鱼上钩时的最小面积阈值",
+            "near_zero_1": 10,
+            "near_zero_1_comment": "判断面积接近0的阈值1（用于判断是否进入收线阶段）",
+            "near_zero_2": 20,
+            "near_zero_2_comment": "判断面积接近0的阈值2（用于判断是否需要切换按键）",
+            "area_decrease": 20,
+            "area_decrease_comment": "判定面积有效减少的最小变化量",
+            "reel_complete": 40,
+            "reel_complete_comment": "判定收线完成的面积阈值",
+            "area_ratio": 0.95,
+            "area_ratio_comment": "判定需要继续拉鱼的面积比例（当前面积/初始面积）"
+        }
     }
 }

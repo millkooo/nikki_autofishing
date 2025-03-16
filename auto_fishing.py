@@ -1,4 +1,3 @@
-import json
 import os
 import sys
 import threading
@@ -13,38 +12,12 @@ from Ui_Manage.WindowManager import WinControl
 from capture.img_processor import ImageProcessor
 from controller.MouseController import mouse
 from controller.KeyboardController import get_input_handler
-
-# 读取配置文件
-def load_config():
-    """从JSON文件加载配置"""
-    try:
-        # 获取配置文件路径
-        try:
-            # PyInstaller创建临时文件夹,将路径存储在_MEIPASS中
-            base_path = sys._MEIPASS
-            config_path = os.path.join(base_path, 'config.json')
-        except Exception:
-            # 如果不是打包的情况,就使用当前文件的目录
-            base_path = os.path.dirname(os.path.abspath(__file__))
-            config_path = os.path.join(base_path, 'config.json')
-            
-        if not os.path.exists(config_path):
-            print(f"配置文件不存在: {config_path}")
-            sys.exit(1)
-            
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-            
-        print(f"成功加载配置文件: {config_path}")
-        return config
-    except Exception as e:
-        print(f"加载配置文件失败: {e}")
-        sys.exit(1)
+from config_manager import CONFIG
 
 class AutoFishing:
     def __init__(self):
-        # 加载配置
-        self.config = load_config()
+        # 使用全局配置
+        self.config = CONFIG
         
         # 初始化窗口和控制器
         self.target_hwnd = WinControl.find_target_window(self.config["window"])
@@ -66,22 +39,13 @@ class AutoFishing:
         self.area_scale_factor = self._calculate_area_scale_factor()
         print(f"面积缩放因子: {self.area_scale_factor}")
         
-        # 基准阈值（1080p分辨率下的值）
-        self.base_thresholds = {
-            "fish_hook": 200,      # 鱼上钩判断阈值
-            "near_zero_1": 5,      # 面积接近0判断阈值1
-            "near_zero_2": 30,     # 面积接近0判断阈值2
-            "area_decrease": 20,   # 有效面积减少判断阈值
-            "reel_complete": 50,   # 收线完成判断阈值
-            "area_ratio": 0.95     # 面积增大需要继续拉鱼的判断比例
-        }
+        # 从配置文件中读取基准阈值
+        self.base_thresholds = self.config["fishing"]["thresholds"]
+        print("成功加载基准阈值配置")
         
         # 颜色范围参数 - 用于检测钓鱼进度
         self.lower = np.array([22, 54, 250])
         self.upper = np.array([25, 88, 255])
-        
-        # 形态学操作内核
-        self.kernel = np.ones((5, 5), np.uint8)
         
         # 钓鱼状态变量
         self.fishing = False
@@ -149,54 +113,35 @@ class AutoFishing:
         self.keyboard_listener.start()
     
     def reset(self):
-        """重置钓鱼状态，返回初始状态"""
-        print("正在重置钓鱼状态...")
-        self.fishing = False
+        """重置钓鱼状态"""
+        print("重置钓鱼状态")
+        print(f"当前状态 - fishing: {self.fishing}, fish_caught: {self.fish_caught}, reeling: {self.reeling}")
+        self.initial_area = 0
+        self.current_area = 0
+        self.last_area = 0
         self.fish_caught = False
         self.reeling = False
         self.reset_flag = False
-        
-        # 如果有收线状态属性，删除它们
-        if hasattr(self, 'reeling_start_time'):
-            delattr(self, 'reeling_start_time')
-        if hasattr(self, 'reeling_clicks'):
-            delattr(self, 'reeling_clicks')
-        
-        print("已返回初始状态，等待开始钓鱼...")
+        print(f"重置后状态 - fishing: {self.fishing}, fish_caught: {self.fish_caught}, reeling: {self.reeling}")
+        # 保留fishing状态，由外部控制
     
     def start(self):
-        """开始自动钓鱼"""
-        print("自动钓鱼已启动，按Q键返回初始状态...")
+        """开始钓鱼"""
+        print("开始钓鱼")
+        print(f"当前状态 - fishing: {self.fishing}, fish_caught: {self.fish_caught}, reeling: {self.reeling}")
+        
+        # 重置停止标志
         self.stop_flag = False
+        self.reset_flag = False
         
-        # 启动监控线程
-        self.monitor_thread = threading.Thread(target=self._monitor_area)
-        self.monitor_thread.daemon = True
-        self.monitor_thread.start()
-        
-        # 主循环
+        # 开始钓鱼循环
         try:
-            while not self.stop_flag:
-                # 检查是否需要重置
-                if self.reset_flag:
-                    self.reset()
-                    continue
-                
-                # 等待右键按下开始钓鱼
-                print("等待右键按下开始钓鱼...")
-                self._wait_for_fishing_start()
-                if self.stop_flag or self.reset_flag:
-                    continue
-                
-                # 开始钓鱼流程
-                self._fishing_process()
-                
-                # 等待一段时间再开始下一轮
-                time.sleep(1)
-        except KeyboardInterrupt:
-            print("程序被手动中断")
-        finally:
-            self.stop()
+            print("开始钓鱼循环")
+            self._fishing_loop()
+        except Exception as e:
+            print(f"钓鱼过程出错: {e}")
+            import traceback
+            print(traceback.format_exc())
     
     def stop(self):
         """停止自动钓鱼"""
@@ -217,9 +162,14 @@ class AutoFishing:
                 time.sleep(0.1)
                 continue
                 
-            # 使用基于1080p的基准参数，通过缩放比例计算实际截图区域
-            # 原始参数为1080p下的: x_offset=260, y_offset=220, width=1000, height=400
-            scaled_region = self._calculate_scaled_region(260, 220, 1000, 400)
+            # 使用配置文件中的检测区域参数
+            region = self.config["fishing"]["region"]
+            scaled_region = self._calculate_scaled_region(
+                region["x_offset"],
+                region["y_offset"],
+                region["width"],
+                region["height"]
+            )
             frame = self.image_processor.capture_region(scaled_region)
             
             if frame is None:
@@ -260,6 +210,40 @@ class AutoFishing:
         from pynput.mouse import Listener as MouseListener
         
         print("请按下右键开始钓鱼...")
+        print(f"当前状态 - fishing: {self.fishing}, fish_caught: {self.fish_caught}, reeling: {self.reeling}")
+        
+        # 如果已经在钓鱼状态，则不需要等待右键点击
+        if self.fishing:
+            print("已经在钓鱼状态，跳过等待右键点击")
+            # 循环按S键等待鱼上钩
+            attempts = 0
+            max_attempts = 30  # 最多等待约9秒
+            
+            while not self.stop_flag and not self.reset_flag and attempts < max_attempts:
+                attempts += 1
+                self.input_handler.press('s', tm=0.2)
+                time.sleep(0.3)
+                
+                # 检查是否有面积出现（鱼上钩）
+                with self.lock:
+                    fish_hook_threshold = self._get_scaled_threshold("fish_hook")
+                    if self.current_area > fish_hook_threshold:  # 使用缩放后的阈值
+                        self.initial_area = self.current_area
+                        print(f"鱼已上钩！初始面积: {self.initial_area}, 阈值: {fish_hook_threshold}")
+                        return True
+            
+            # 如果超过最大尝试次数仍未上钩
+            if attempts >= max_attempts:
+                print("等待鱼上钩超时，重置钓鱼状态")
+                self.reset_flag = True
+            
+            # 检查是否需要重置
+            if self.reset_flag:
+                return False
+            
+            self.fishing = False
+            return False
+            
         self.fishing = False
         right_clicked = False
         
@@ -276,9 +260,8 @@ class AutoFishing:
         listener = MouseListener(on_click=on_click)
         listener.start()
         
-        # 等待右键点击或超时
-        wait_start_time = time.time()
-        while not right_clicked and not self.stop_flag and not self.reset_flag and time.time() - wait_start_time < 30:
+        # 等待右键点击
+        while not right_clicked and not self.stop_flag and not self.reset_flag:
             time.sleep(0.1)
         
         # 停止监听器
@@ -289,18 +272,13 @@ class AutoFishing:
         if self.reset_flag or self.stop_flag:
             return False
         
-        if not right_clicked:
-            print("等待右键超时，取消钓鱼")
-            return False
-        
         print("已检测到右键点击，等待鱼上钩...")
         self.fishing = True
-        
+        time.sleep(1)
         # 循环按S键等待鱼上钩
-        start_time = time.time()
-        while not self.stop_flag and not self.reset_flag and time.time() - start_time < 20:  # 最多等待20秒
+        while not self.stop_flag and not self.reset_flag:
             self.input_handler.press('s', tm=0.2)
-            time.sleep(0.3)
+            time.sleep(0.2)
             
             # 检查是否有面积出现（鱼上钩）
             with self.lock:
@@ -314,36 +292,42 @@ class AutoFishing:
         if self.reset_flag:
             return False
         
-        # 超时处理
-        print("等待超时，鱼没有上钩")
         self.fishing = False
         return False
     
     def _fishing_process(self):
         """完整的钓鱼流程"""
         if not self.fishing:
+            print("当前不在钓鱼状态，退出钓鱼流程")
             return
         
         print("开始钓鱼流程...")
+        print(f"当前状态 - fishing: {self.fishing}, fish_caught: {self.fish_caught}, reeling: {self.reeling}")
+        print(f"当前面积: {self.current_area}, 初始面积: {self.initial_area}")
+        
         self.fish_caught = False
         self.reeling = False
         
         # 拉鱼阶段
+        print("进入拉鱼阶段")
         while not self.stop_flag and not self.reset_flag and not self.fish_caught:
             # 检查是否需要重置
             if self.reset_flag:
+                print("检测到重置标志，退出拉鱼阶段")
                 break
                 
             # 检查面积变化，决定按哪个键
             with self.lock:
                 current = self.current_area
                 last = self.last_area
+                
+            print(f"当前面积: {current}, 上次面积: {last}, 差值: {current - last}")
             
             # 如果面积接近0，表示拉线阶段结束，应该进入收线阶段
             near_zero_threshold = self._get_scaled_threshold("near_zero_1")
             if current < near_zero_threshold and not self.reeling:  # 使用缩放后的阈值
                 print(f"面积接近0 ({current} < {near_zero_threshold})，拉线阶段结束，进入收线阶段")
-                self._press_alternating_keys(0.5)
+                self._press_alternating_keys(0.4)
                 self.reeling = True
                 # 立即跳转到收线阶段处理
                 continue
@@ -353,7 +337,7 @@ class AutoFishing:
                 # 尝试按A键，看面积是否减少
                 print("尝试按A键")
                 self.input_handler.press('a', tm=0.5)
-                time.sleep(0.2)  # 给监控线程时间更新面积
+                time.sleep(0.1)  # 给监控线程时间更新面积
                 
                 with self.lock:
                     new_area = self.current_area
@@ -369,7 +353,7 @@ class AutoFishing:
                 else:  # 尝试D键
                     print("尝试按D键")
                     self.input_handler.press('d', tm=0.5)
-                    time.sleep(0.2)  # 给监控线程时间更新面积
+                    time.sleep(0.1)  # 给监控线程时间更新面积
                     
                     with self.lock:
                         new_area = self.current_area
@@ -400,7 +384,7 @@ class AutoFishing:
                     mouse.click_right(0.02)
                     self.reeling_clicks += 1
                     print(f"---------正在右键 {self.reeling_clicks}--------")
-                    time.sleep(0.05)
+                    time.sleep(0.03)
                 
                 # 检查是否需要重置
                 if self.reset_flag:
@@ -463,7 +447,7 @@ class AutoFishing:
                 print(f"面积接近0 ({current} < {near_zero_threshold})，拉线阶段结束，进入收线阶段")
                 self.reeling = True
                 entered_reeling = True
-                self._press_alternating_keys(0.5)
+                self._press_alternating_keys(0.6)
                 return True
             
             # 检查面积是否减少
@@ -491,7 +475,76 @@ class AutoFishing:
     def _press_alternating_keys(self, duration):
         """交替按A和D键指定时间"""
         start_time = time.time()
+        initial_area = 0
+        
+        # 获取初始面积
+        with self.lock:
+            initial_area = self.current_area
+        
         while time.time() - start_time < duration and not self.stop_flag and not self.reset_flag:
-            self.input_handler.press('a', tm=0.08)
-            self.input_handler.press('d', tm=0.08)
+            self.input_handler.press('a', tm=0.1)
+            
+            # 检查面积是否增加
+            with self.lock:
+                current_area = self.current_area
+                area_increase_threshold = self._get_scaled_threshold("area_decrease")  # 复用减少阈值作为增加阈值
+                
+                # 如果面积明显增加，立即进入收线阶段
+                if current_area > initial_area + area_increase_threshold:
+                    print(f"交替按键过程中检测到面积增加: {current_area} > {initial_area + area_increase_threshold}，立即进入收线阶段")
+                    self.reeling = True
+                    return
+            
+            self.input_handler.press('d', tm=0.1)
+            
+            # 再次检查面积是否增加
+            with self.lock:
+                current_area = self.current_area
+                
+                # 如果面积明显增加，立即进入收线阶段
+                if current_area > initial_area + area_increase_threshold:
+                    print(f"交替按键过程中检测到面积增加: {current_area} > {initial_area + area_increase_threshold}，立即进入收线阶段")
+                    self.reeling = True
+                    return
+    
+    def _fishing_loop(self):
+        """钓鱼主循环"""
+        print("进入钓鱼主循环")
+        
+        # 启动监控线程
+        self.monitor_thread = threading.Thread(target=self._monitor_area)
+        self.monitor_thread.daemon = True
+        self.monitor_thread.start()
+        print("监控线程已启动")
+        
+        # 主循环
+        try:
+            while not self.stop_flag:
+                # 检查是否需要重置
+                if self.reset_flag:
+                    print("检测到重置标志，重置钓鱼状态")
+                    self.reset()
+                    # 如果fishing状态为True，说明是连续钓鱼模式，不需要等待右键点击
+                    if self.fishing:
+                        print("连续钓鱼模式，跳过等待右键点击")
+                        # 直接进入钓鱼流程
+                        if self._wait_for_fishing_start() and not self.stop_flag and not self.reset_flag:
+                            print("开始钓鱼流程")
+                            self._fishing_process()
+                    continue
+                
+                # 等待右键按下开始钓鱼
+                print("等待右键按下开始钓鱼...")
+                if self._wait_for_fishing_start() and not self.stop_flag and not self.reset_flag:
+                    # 开始钓鱼流程
+                    print("右键已按下，开始钓鱼流程")
+                    self._fishing_process()
+                
+                # 等待一段时间再开始下一轮
+                time.sleep(1)
+        except KeyboardInterrupt:
+            print("程序被手动中断")
+        finally:
+            print("钓鱼循环结束")
+            self.stop()
 

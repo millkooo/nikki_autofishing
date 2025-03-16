@@ -1,5 +1,4 @@
 import ctypes
-import json
 import os
 import sys
 import time
@@ -8,6 +7,7 @@ import win32api
 import win32gui
 
 from Ui_Manage.WindowManager import WinControl
+from config_manager import CONFIG
 
 
 def load_config():
@@ -160,14 +160,6 @@ class MouseController:
         input_struct = INPUT(self.INPUT_MOUSE, mi)
 
         self.SendInput(1, ctypes.byref(input_struct), ctypes.sizeof(INPUT))
-
-    @property
-    def current_position(self) -> tuple:
-        """获取当前鼠标在窗口客户区中的坐标"""
-        hwnd = self._get_hwnd()
-        screen_x, screen_y = win32api.GetCursorPos()
-        window_left, window_top = win32gui.ClientToScreen(hwnd, (0, 0))
-        return (screen_x - window_left, screen_y - window_top)
 
     def press_left(self):
         """按下左键"""

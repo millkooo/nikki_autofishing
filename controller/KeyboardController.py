@@ -6,45 +6,18 @@ from ctypes import wintypes
 import win32con
 import win32api
 import win32gui
-import json
 
 # 添加项目根目录到系统路径
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-def load_config():
-    """从JSON文件加载配置"""
-    try:
-        # 获取配置文件路径
-        try:
-            # PyInstaller创建临时文件夹,将路径存储在_MEIPASS中
-            base_path = sys._MEIPASS
-            config_path = os.path.join(base_path, 'config.json')
-        except Exception:
-            # 如果不是打包的情况,就使用当前文件的目录
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            config_path = os.path.join(base_path, 'config.json')
-
-        if not os.path.exists(config_path):
-            print(f"配置文件不存在: {config_path}")
-            sys.exit(1)
-
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-
-        print(f"成功加载配置文件: {config_path}")
-        return config
-    except Exception as e:
-        print(f"加载配置文件失败: {e}")
-        sys.exit(1)
-
-
 from Ui_Manage.WindowManager import WinControl
 from pynput.keyboard import Controller, Listener, Key, KeyCode
+from config_manager import CONFIG
 
 class InputHandler:
 
-    def __init__(self, config, foreground=True):
-            self.config = config
+    def __init__(self, config=None, foreground=True):
+            self.config = config if config is not None else CONFIG
             self.foreground = foreground
             self.game_hwnd = None
             self.stop_flag = False
@@ -164,11 +137,10 @@ class InputHandler:
             # 发送释放事件
             win32api.PostMessage(self.game_hwnd, win32con.WM_KEYUP, vk_code, 0)
 
-    def __del__(self):
-        """确保释放资源"""
+    def close(self):
+        """关闭输入处理器"""
         if hasattr(self, 'listener') and self.listener.is_alive():
             self.listener.stop()
-
 
 
 _instance = None
@@ -178,7 +150,7 @@ def get_input_handler(config=None, foreground=True):
     if _instance is None:
         if config is None:
             # 直接使用当前文件中定义的load_config
-            config = load_config()  # 移除相对导入
+            config = CONFIG  # 移除相对导入
         _instance = InputHandler(config, foreground=foreground)
     return _instance
 

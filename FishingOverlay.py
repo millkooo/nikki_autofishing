@@ -1,10 +1,12 @@
 import logging
 import os
 import sys
+import json
+import random
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QProgressBar
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QProgressBar, QCheckBox, QComboBox
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Ui_Manage.TransparentOverlay import TransparentOverlay
@@ -13,12 +15,23 @@ from Ui_Manage.TransparentOverlay import TransparentOverlay
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+def get_resource_path(relative_path):
+    """获取资源文件的绝对路径"""
+    if hasattr(sys, '_MEIPASS'):
+        # PyInstaller 创建临时文件夹，将路径存储在 _MEIPASS 中
+        base_path = sys._MEIPASS
+    else:
+        base_path = os.path.abspath(".")
+    return os.path.join(base_path, relative_path)
+
 class FishingOverlay(TransparentOverlay):
     """钓鱼专用透明覆盖窗口类"""
     
     # 定义信号
     start_signal = pyqtSignal()
     stop_signal = pyqtSignal()
+    fishing_mode_changed = pyqtSignal(int)  # 新增信号，用于通知钓鱼模式变更
+    show_region_signal = pyqtSignal(bool)  # True表示显示区域，False表示隐藏区域
     
     def __init__(self, target_config=None, parent=None):
         """初始化钓鱼透明窗口
@@ -27,12 +40,62 @@ class FishingOverlay(TransparentOverlay):
             target_config: 目标窗口配置，包含title_part, window_class, process_exe
             parent: 父窗口
         """
+        # 在调用父类初始化之前先初始化stories
+        # 加载小姚故事集
+        try:
+            story_path = get_resource_path('小姚故事选集.json')
+            with open(story_path, 'r', encoding='utf-8') as f:
+                self.stories = json.load(f)['stories']
+        except Exception as e:
+            logger.error(f"加载故事集失败: {e}")
+            self.stories = ["莴苣去年和欧的白求的婚"]  
+            
         super(FishingOverlay, self).__init__(target_config, parent)
         
         # 钓鱼状态
         self.is_fishing = False
         self.fish_progress = 0
         self.fish_status = "等待开始钓鱼..."
+        
+        # 拖动相关变量
+        self.dragging = False
+        self.drag_position = None
+        
+        # 设置鼠标追踪
+        self.setMouseTracking(True)
+        self.title_label.setMouseTracking(True)
+        self.title_label.setCursor(Qt.OpenHandCursor)
+        
+        # 添加新的状态变量
+        self.show_region = False
+        self.title_click_count = 0  # 添加标题点击计数器
+        self.start_click_count = 0  # 添加开始按钮点击计数器
+        
+        self.init_ui()
+        
+    def format_story(self, story):
+        """格式化故事文本，确保最多三行显示，每行最多14个中文字
+        
+        Args:
+            story: 原始故事文本
+            
+        Returns:
+            格式化后的故事文本
+        """
+        prefix = "冷知识："
+        max_chars = 14  # 每行最多字符数
+        
+        if len(story) <= max_chars - len(prefix):  # 如果故事加上前缀不超过14个字符
+            return prefix + story
+        elif len(story) <= max_chars * 2 - len(prefix):  # 如果故事需要两行
+            first_line = prefix + story[:max_chars - len(prefix)]
+            second_line = story[max_chars - len(prefix):max_chars * 2 - len(prefix)]
+            return first_line + "\n" + second_line
+        else:  
+            first_line = prefix + story[:max_chars - len(prefix)]
+            second_line = story[max_chars - len(prefix):max_chars * 2 - len(prefix)]
+            third_line = story[max_chars * 2 - len(prefix):max_chars * 3 - len(prefix)]
+            return first_line + "\n" + second_line + "\n" + third_line
         
     def init_ui(self):
         """初始化UI组件，重写父类方法"""
@@ -54,6 +117,37 @@ class FishingOverlay(TransparentOverlay):
         self.status_label = QLabel("状态: 等待开始")
         self.status_label.setStyleSheet("color: white; font-size: 14px; background-color: rgba(0, 0, 0, 100); padding: 5px;")
         self.layout.addWidget(self.status_label)
+        
+        # 钓鱼模式选择
+        self.mode_layout = QHBoxLayout()
+        self.mode_label = QLabel("钓鱼模式:")
+        self.mode_label.setStyleSheet("color: white; font-size: 14px;")
+        self.mode_layout.addWidget(self.mode_label)
+        
+        self.mode_combo = QComboBox()
+        self.mode_combo.addItem("单次钓鱼")
+        self.mode_combo.addItem("钓鱼2次")
+        self.mode_combo.addItem("钓鱼3次")
+        self.mode_combo.setStyleSheet("""
+            QComboBox {
+                background-color: rgba(50, 50, 50, 150);
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QComboBox:hover {
+                background-color: rgba(70, 70, 70, 170);
+            }
+            QComboBox QAbstractItemView {
+                background-color: rgba(50, 50, 50, 200);
+                color: white;
+                selection-background-color: rgba(0, 150, 255, 150);
+            }
+        """)
+        self.mode_combo.currentIndexChanged.connect(self.on_mode_changed)
+        self.mode_layout.addWidget(self.mode_combo)
+        
+        self.layout.addLayout(self.mode_layout)
         
         # 进度条
         self.progress_bar = QProgressBar()
@@ -118,12 +212,47 @@ class FishingOverlay(TransparentOverlay):
         self.stop_button.setEnabled(False)
         self.button_layout.addWidget(self.stop_button)
         
+        # 在按钮布局中添加新的按钮
+        self.show_region_button = QPushButton("显示检测区域")
+        self.show_region_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(150, 150, 0, 200);
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+                font-weight: bold;
+            }
+            QPushButton:hover {
+                background-color: rgba(180, 180, 0, 220);
+            }
+            QPushButton:pressed {
+                background-color: rgba(120, 120, 0, 200);
+            }
+            QPushButton:checked {
+                background-color: rgba(200, 200, 0, 220);
+            }
+        """)
+        self.show_region_button.setCheckable(True)  # 使按钮可切换
+        self.show_region_button.clicked.connect(self.on_show_region_clicked)
+        self.button_layout.addWidget(self.show_region_button)
+        self.show_region_button.hide()  # 初始时隐藏按钮
+        
         self.layout.addLayout(self.button_layout)
         
         # 信息标签
-        self.info_label = QLabel("提示: 莴苣妈妈不是莴笋，是贡菜")
-        self.info_label.setStyleSheet("color: white; font-size: 16px; background-color: rgba(0, 0, 0, 100); padding: 5px;")
-        self.info_label.setAlignment(Qt.AlignCenter)
+        random_story = random.choice(self.stories)
+        formatted_story = self.format_story(random_story)
+        self.info_label = QLabel(formatted_story)  
+        self.info_label.setStyleSheet("""
+            QLabel {
+                color: white;
+                font-size: 16px;
+                background-color: rgba(0, 0, 0, 100);
+                padding: 5px;
+                qproperty-alignment: AlignCenter;
+            }
+        """)
+        self.info_label.setFixedHeight(100)  # 保持三行高度
         self.layout.addWidget(self.info_label)
         
         # 日志区域
@@ -135,7 +264,7 @@ class FishingOverlay(TransparentOverlay):
         self.layout.addWidget(self.log_label)
         
         # 设置窗口大小和位置
-        self.setGeometry(1550, 250, 300, 350)
+        self.setGeometry(1550, 250, 300, 400)  # 增加高度以适应新添加的控件
         
     def paintEvent(self, event):
         """绘制事件，自定义窗口外观"""
@@ -158,7 +287,17 @@ class FishingOverlay(TransparentOverlay):
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
         self.status_label.setText("状态: 正在钓鱼")
+        self.update_story()  # 更新故事
         self.add_log("开始钓鱼")
+        self.add_log(f"当前钓鱼模式: {self.mode_combo.currentText()}")
+        self.add_log(f"模式索引: {self.mode_combo.currentIndex()}")
+        
+        # 增加点击计数并检查是否显示检测区域按钮
+        self.start_click_count += 1
+        if self.start_click_count >= 8 and not self.show_region_button.isVisible():
+            self.show_region_button.show()
+            self.add_log("已解锁显示检测区域功能")
+        
         self.start_signal.emit()
     
     def on_stop_clicked(self):
@@ -168,6 +307,7 @@ class FishingOverlay(TransparentOverlay):
         self.stop_button.setEnabled(False)
         self.status_label.setText("状态: 已停止")
         self.add_log("停止钓鱼")
+        self.add_log(f"当前钓鱼模式: {self.mode_combo.currentText()}")
         self.stop_signal.emit()
     
     def update_fishing_progress(self, progress, status=None):
@@ -181,9 +321,15 @@ class FishingOverlay(TransparentOverlay):
         self.progress_bar.setValue(progress)
         
         if status:
+            old_status = self.fish_status
             self.fish_status = status
             self.status_label.setText(f"状态: {status}")
-            self.add_log(status)
+            
+            # 只有状态变化时才添加日志
+            if old_status != status:
+                self.add_log(status)
+                if status == "钓鱼完成！等待手动开始下一次" and self.mode_combo.currentIndex() == 1:
+                    self.add_log("自动钓鱼模式: 等待自动开始下一次钓鱼")
     
     def add_log(self, message):
         """添加日志消息
@@ -202,20 +348,60 @@ class FishingOverlay(TransparentOverlay):
         lines.append(message)
         self.log_label.setText('\n'.join(lines))
 
-# 示例用法
-def main():
-    app = QApplication(sys.argv)
+    def mousePressEvent(self, event):
+        """鼠标按下事件"""
+        if event.button() == Qt.LeftButton:
+            # 只有点击标题栏才能拖动
+            if self.title_label.geometry().contains(event.pos()):
+                self.dragging = True
+                self.drag_position = event.globalPos() - self.frameGeometry().topLeft()
+                self.title_label.setCursor(Qt.ClosedHandCursor)
+                
+                # 增加标题点击计数并检查是否显示检测区域按钮
+                self.title_click_count += 1
+                if self.title_click_count >= 8 and not self.show_region_button.isVisible():
+                    self.show_region_button.show()
+                    self.add_log("已解锁显示检测区域功能")
+                
+                event.accept()
     
-    # 目标窗口配置
-    target_config = {
-        "title_part": "无限暖暖",
-        "window_class": "UnrealWindow",
-        "process_exe": "X6Game-Win64-Shipping.exe"
-    }
+    def mouseReleaseEvent(self, event):
+        """鼠标释放事件"""
+        if event.button() == Qt.LeftButton:
+            self.dragging = False
+            self.title_label.setCursor(Qt.OpenHandCursor)
+            event.accept()
     
-    # 创建钓鱼覆盖窗口
-    overlay = FishingOverlay(target_config)
-    overlay.show()
-    
-    sys.exit(app.exec_())
+    def mouseMoveEvent(self, event):
+        """鼠标移动事件"""
+        if self.dragging and event.buttons() == Qt.LeftButton:
+            self.move(event.globalPos() - self.drag_position)
+            event.accept()
+
+    def on_mode_changed(self, index):
+        """钓鱼模式变更事件"""
+        mode_name = self.mode_combo.currentText()
+        self.add_log(f"钓鱼模式已切换为: {mode_name}")
+        self.add_log(f"模式索引: {index}")
+        
+        if self.is_fishing:
+            self.add_log("警告: 在钓鱼过程中切换模式，将停止当前钓鱼")
+            
+        self.fishing_mode_changed.emit(index)
+
+    def update_story(self):
+        """更新显示的故事"""
+        random_story = random.choice(self.stories)
+        formatted_story = self.format_story(random_story)
+        self.info_label.setText(formatted_story)  # 不需要额外添加冷知识前缀
+
+    def on_show_region_clicked(self):
+        """显示/隐藏检测区域按钮点击事件"""
+        self.show_region = self.show_region_button.isChecked()
+        self.show_region_signal.emit(self.show_region)
+        if self.show_region:
+            self.add_log("显示检测区域")
+        else:
+            self.add_log("隐藏检测区域")
+
 
