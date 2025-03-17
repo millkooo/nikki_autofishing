@@ -41,7 +41,13 @@ class FishingOverlay(TransparentOverlay):
             target_config: 目标窗口配置，包含title_part, window_class, process_exe
             parent: 父窗口
         """
-        # 在调用父类初始化之前先初始化stories
+        # 在调用父类初始化之前先初始化stories和缩放相关变量
+        # 缩放相关变量
+        self.scale_factor = 1.0  # 初始缩放比例为1.0
+        self.min_scale = 0.5    # 最小缩放比例
+        self.max_scale = 2.0    # 最大缩放比例
+        self.original_size = (300, 400)  # 原始窗口大小
+        
         # 加载小姚故事集
         try:
             story_path = get_resource_path('小姚故事选集.json')
@@ -62,23 +68,18 @@ class FishingOverlay(TransparentOverlay):
         self.dragging = False
         self.drag_position = None
         
-        # 设置鼠标追踪
-        self.setMouseTracking(True)
-        self.title_label.setMouseTracking(True)
-        self.title_label.setCursor(Qt.OpenHandCursor)
-        
         # 添加新的状态变量
         self.show_region = False
         self.title_click_count = 0  # 添加标题点击计数器
         self.start_click_count = 0  # 添加开始按钮点击计数器
         
-        # 缩放相关变量
-        self.scale_factor = 1.0  # 初始缩放比例为1.0
-        self.min_scale = 0.5    # 最小缩放比例
-        self.max_scale = 2.0    # 最大缩放比例
-        self.original_size = (300, 400)  # 原始窗口大小
-        
+        # 初始化UI
         self.init_ui()
+        
+        # 设置鼠标追踪 - 移到init_ui之后，确保title_label已经创建
+        self.setMouseTracking(True)
+        self.title_label.setMouseTracking(True)
+        self.title_label.setCursor(Qt.OpenHandCursor)
         
     def format_story(self, story):
         """格式化故事文本，确保最多三行显示，每行最多14个中文字
@@ -351,7 +352,6 @@ class FishingOverlay(TransparentOverlay):
         
         # 设置窗口大小和位置
         self.setGeometry(1550, 250, 300, 400)  # 增加高度以适应新添加的控件
-        self.original_size = (300, 400)  # 保存原始大小
         
     def paintEvent(self, event):
         """绘制事件，自定义窗口外观"""
@@ -544,7 +544,7 @@ class FishingOverlay(TransparentOverlay):
         self.add_log(f"UI缩放比例已调整为: {int(self.scale_factor * 100)}%")
         
     def update_font_sizes(self):
-        """根据缩放比例更新字体大小"""
+        """根据缩放比例更新字体大小和控件大小"""
         # 标题标签
         title_style = self.title_label.styleSheet()
         title_style = self.update_font_size_in_style(title_style, 18)
@@ -560,15 +560,85 @@ class FishingOverlay(TransparentOverlay):
         mode_style = self.update_font_size_in_style(mode_style, 14)
         self.mode_label.setStyleSheet(mode_style)
         
+        # 模式选择框
+        combo_style = self.mode_combo.styleSheet()
+        combo_style = self.update_font_size_in_style(combo_style, 14)
+        combo_style = self.update_padding_in_style(combo_style, 5)
+        combo_style = self.update_border_radius_in_style(combo_style, 5)
+        self.mode_combo.setStyleSheet(combo_style)
+        
+        # 进度条
+        progress_style = self.progress_bar.styleSheet()
+        progress_style = self.update_font_size_in_style(progress_style, 14)
+        progress_style = self.update_height_in_style(progress_style, 20)
+        progress_style = self.update_border_radius_in_style(progress_style, 5)
+        self.progress_bar.setStyleSheet(progress_style)
+        
+        # 开始按钮
+        start_style = self.start_button.styleSheet()
+        start_style = self.update_font_size_in_style(start_style, 14)
+        start_style = self.update_padding_in_style(start_style, 5)
+        start_style = self.update_border_radius_in_style(start_style, 5)
+        self.start_button.setStyleSheet(start_style)
+        
+        # 停止按钮
+        stop_style = self.stop_button.styleSheet()
+        stop_style = self.update_font_size_in_style(stop_style, 14)
+        stop_style = self.update_padding_in_style(stop_style, 5)
+        stop_style = self.update_border_radius_in_style(stop_style, 5)
+        self.stop_button.setStyleSheet(stop_style)
+        
+        # 显示检测区域按钮
+        region_style = self.show_region_button.styleSheet()
+        region_style = self.update_font_size_in_style(region_style, 14)
+        region_style = self.update_padding_in_style(region_style, 5)
+        region_style = self.update_border_radius_in_style(region_style, 5)
+        self.show_region_button.setStyleSheet(region_style)
+        
+        # 缩小按钮
+        zoom_out_style = self.zoom_out_button.styleSheet()
+        zoom_out_style = self.update_font_size_in_style(zoom_out_style, 14)
+        zoom_out_style = self.update_padding_in_style(zoom_out_style, 5)
+        zoom_out_style = self.update_border_radius_in_style(zoom_out_style, 5)
+        zoom_out_style = self.update_min_width_in_style(zoom_out_style, 30)
+        self.zoom_out_button.setStyleSheet(zoom_out_style)
+        
+        # 放大按钮
+        zoom_in_style = self.zoom_in_button.styleSheet()
+        zoom_in_style = self.update_font_size_in_style(zoom_in_style, 14)
+        zoom_in_style = self.update_padding_in_style(zoom_in_style, 5)
+        zoom_in_style = self.update_border_radius_in_style(zoom_in_style, 5)
+        zoom_in_style = self.update_min_width_in_style(zoom_in_style, 30)
+        self.zoom_in_button.setStyleSheet(zoom_in_style)
+        
+        # 缩放滑块
+        slider_style = self.scale_slider.styleSheet()
+        slider_style = self.update_height_in_style(slider_style, 8, "QSlider::groove:horizontal")
+        slider_style = self.update_width_in_style(slider_style, 16, "QSlider::handle:horizontal")
+        slider_style = self.update_border_radius_in_style(slider_style, 4, "QSlider::groove:horizontal")
+        slider_style = self.update_border_radius_in_style(slider_style, 8, "QSlider::handle:horizontal")
+        self.scale_slider.setStyleSheet(slider_style)
+        
+        # 缩放比例标签
+        scale_label_style = self.scale_label.styleSheet()
+        scale_label_style = self.update_font_size_in_style(scale_label_style, 12)
+        self.scale_label.setStyleSheet(scale_label_style)
+        
         # 信息标签
         info_style = self.info_label.styleSheet()
         info_style = self.update_font_size_in_style(info_style, 16)
+        info_style = self.update_padding_in_style(info_style, 5)
         self.info_label.setStyleSheet(info_style)
+        # 调整信息标签高度
+        self.info_label.setFixedHeight(int(100 * self.scale_factor))
         
         # 日志标签
         log_style = self.log_label.styleSheet()
         log_style = self.update_font_size_in_style(log_style, 12)
+        log_style = self.update_padding_in_style(log_style, 5)
         self.log_label.setStyleSheet(log_style)
+        # 调整日志标签最小高度
+        self.log_label.setMinimumHeight(int(100 * self.scale_factor))
         
     def update_font_size_in_style(self, style, base_size):
         """在样式表中更新字体大小
@@ -592,5 +662,140 @@ class FishingOverlay(TransparentOverlay):
             return re.sub(pattern, replacement, style)
         else:
             return style
+            
+    def update_padding_in_style(self, style, base_padding, selector=""):
+        """在样式表中更新内边距
+        
+        Args:
+            style: 原始样式表
+            base_padding: 基础内边距
+            selector: CSS选择器，为空时应用于整个样式
+            
+        Returns:
+            更新后的样式表
+        """
+        import re
+        # 计算新的内边距
+        new_padding = int(base_padding * self.scale_factor)
+        
+        # 使用正则表达式替换内边距
+        if selector:
+            pattern = rf'{selector}\s*{{\s*[^}}]*padding:\s*\d+px[^}}]*}}'
+            if re.search(pattern, style):
+                return re.sub(r'padding:\s*\d+px', f'padding: {new_padding}px', style)
+        else:
+            pattern = r'padding:\s*\d+px'
+            if re.search(pattern, style):
+                return re.sub(pattern, f'padding: {new_padding}px', style)
+        
+        return style
+        
+    def update_border_radius_in_style(self, style, base_radius, selector=""):
+        """在样式表中更新边框圆角
+        
+        Args:
+            style: 原始样式表
+            base_radius: 基础圆角半径
+            selector: CSS选择器，为空时应用于整个样式
+            
+        Returns:
+            更新后的样式表
+        """
+        import re
+        # 计算新的圆角半径
+        new_radius = int(base_radius * self.scale_factor)
+        
+        # 使用正则表达式替换圆角半径
+        if selector:
+            pattern = rf'{selector}\s*{{\s*[^}}]*border-radius:\s*\d+px[^}}]*}}'
+            if re.search(pattern, style):
+                return re.sub(r'border-radius:\s*\d+px', f'border-radius: {new_radius}px', style)
+        else:
+            pattern = r'border-radius:\s*\d+px'
+            if re.search(pattern, style):
+                return re.sub(pattern, f'border-radius: {new_radius}px', style)
+        
+        return style
+        
+    def update_height_in_style(self, style, base_height, selector=""):
+        """在样式表中更新高度
+        
+        Args:
+            style: 原始样式表
+            base_height: 基础高度
+            selector: CSS选择器，为空时应用于整个样式
+            
+        Returns:
+            更新后的样式表
+        """
+        import re
+        # 计算新的高度
+        new_height = int(base_height * self.scale_factor)
+        
+        # 使用正则表达式替换高度
+        if selector:
+            pattern = rf'{selector}\s*{{\s*[^}}]*height:\s*\d+px[^}}]*}}'
+            if re.search(pattern, style):
+                return re.sub(r'height:\s*\d+px', f'height: {new_height}px', style)
+        else:
+            pattern = r'height:\s*\d+px'
+            if re.search(pattern, style):
+                return re.sub(pattern, f'height: {new_height}px', style)
+        
+        return style
+        
+    def update_width_in_style(self, style, base_width, selector=""):
+        """在样式表中更新宽度
+        
+        Args:
+            style: 原始样式表
+            base_width: 基础宽度
+            selector: CSS选择器，为空时应用于整个样式
+            
+        Returns:
+            更新后的样式表
+        """
+        import re
+        # 计算新的宽度
+        new_width = int(base_width * self.scale_factor)
+        
+        # 使用正则表达式替换宽度
+        if selector:
+            pattern = rf'{selector}\s*{{\s*[^}}]*width:\s*\d+px[^}}]*}}'
+            if re.search(pattern, style):
+                return re.sub(r'width:\s*\d+px', f'width: {new_width}px', style)
+        else:
+            pattern = r'width:\s*\d+px'
+            if re.search(pattern, style):
+                return re.sub(pattern, f'width: {new_width}px', style)
+        
+        return style
+        
+    def update_min_width_in_style(self, style, base_width, selector=""):
+        """在样式表中更新最小宽度
+        
+        Args:
+            style: 原始样式表
+            base_width: 基础最小宽度
+            selector: CSS选择器，为空时应用于整个样式
+            
+        Returns:
+            更新后的样式表
+        """
+        import re
+        # 计算新的最小宽度
+        new_min_width = int(base_width * self.scale_factor)
+        
+        # 使用正则表达式替换最小宽度
+        if selector:
+            pattern = rf'{selector}\s*{{\s*[^}}]*min-width:\s*\d+px[^}}]*}}'
+            if re.search(pattern, style):
+                return re.sub(r'min-width:\s*\d+px', f'min-width: {new_min_width}px', style)
+        else:
+            pattern = r'min-width:\s*\d+px'
+            if re.search(pattern, style):
+                return re.sub(pattern, f'min-width: {new_min_width}px', style)
+        
+        return style
 
 

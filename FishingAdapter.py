@@ -42,6 +42,7 @@ class FishingAdapter(QObject):
         self.overlay.stop_signal.connect(self.stop_fishing)
         self.overlay.fishing_mode_changed.connect(self.on_fishing_mode_changed)  # 连接钓鱼模式变更信号
         self.overlay.show_region_signal.connect(self.on_show_region_changed)  # 连接新的信号
+        self.overlay.scale_changed_signal.connect(self.on_scale_changed)  # 连接UI缩放变更信号
         self.progress_updated.connect(self.overlay.update_fishing_progress)
         self.log_message.connect(self.overlay.add_log)
         
@@ -57,6 +58,9 @@ class FishingAdapter(QObject):
         
         # 检测区域窗口
         self.region_window = None
+        
+        # UI缩放相关变量
+        self.ui_scale = 1.0  # 初始UI缩放比例
         
         # 初始化进度更新定时器
         self.setup_progress_timer()
@@ -382,6 +386,37 @@ class FishingAdapter(QObject):
             if self.region_window:
                 self.region_window.close()
                 self.region_window = None
+                
+    def on_scale_changed(self, scale):
+        """处理UI缩放比例变更
+        
+        Args:
+            scale: 新的缩放比例
+        """
+        self.ui_scale = scale
+        self.log_message.emit(f"UI缩放比例已更新: {int(scale * 100)}%")
+        
+        # 如果检测区域窗口存在，也需要更新其大小
+        if self.region_window and hasattr(self, 'auto_fishing') and hasattr(self.auto_fishing, 'target_hwnd'):
+            # 获取游戏窗口位置
+            rect = win32gui.GetWindowRect(self.auto_fishing.target_hwnd)
+            
+            # 从配置文件获取检测区域参数
+            region = self.auto_fishing.config["fishing"]["region"]
+            scaled_region = self.auto_fishing._calculate_scaled_region(
+                region["x_offset"],
+                region["y_offset"],
+                region["width"],
+                region["height"]
+            )
+            
+            # 设置窗口位置和大小
+            x = rect[0] + scaled_region['x_offset']
+            y = rect[1] + scaled_region['y_offset']
+            width = scaled_region['width']
+            height = scaled_region['height']
+            
+            self.region_window.setGeometry(x, y, width, height)
 
 def main():
     """主函数"""
