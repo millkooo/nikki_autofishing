@@ -331,7 +331,7 @@ class AutoFishing:
             near_zero_threshold = self._get_scaled_threshold("near_zero_1")
             if current < near_zero_threshold and not self.reeling:  # 使用缩放后的阈值
                 print(f"面积接近0 ({current} < {near_zero_threshold})，拉线阶段结束，进入收线阶段")
-                self._press_alternating_keys(0.4)
+                self._press_alternating_keys(0.8)
                 self.reeling = True
                 # 立即跳转到收线阶段处理
                 continue
@@ -455,7 +455,7 @@ class AutoFishing:
                 print(f"面积接近0 ({current} < {near_zero_threshold})，拉线阶段结束，进入收线阶段")
                 self.reeling = True
                 entered_reeling = True
-                self._press_alternating_keys(0.6)
+                self._press_alternating_keys(0.8)
                 return True
             
             # 检查面积是否减少
@@ -481,41 +481,49 @@ class AutoFishing:
         return start_area - final_area > area_decrease_threshold * 1.5  # 返回是否有效减少过面积，使用缩放后的阈值
     
     def _press_alternating_keys(self, duration):
-        """交替按A和D键指定时间"""
+        """交替按A和D键指定时间，同时进行收线操作"""
         start_time = time.time()
         
         # 使用鱼上钩时记录的初始面积，而不是当前面积
         initial_area = self.initial_area
         
-        # 计算阈值：初始面积的八分之一
+        # 计算阈值：初始面积的九分之一
         threshold = initial_area / 9
-        print(f"交替按键阈值设置为初始面积的就分之一: {threshold} (初始面积: {initial_area})")
+        print(f"交替按键阈值设置为初始面积的九分之一: {threshold} (初始面积: {initial_area})")
         
         while time.time() - start_time < duration and not self.stop_flag and not self.reset_flag:
+            # 按A键
             self.input_handler.press('a', tm=0.08)
+            # 同时进行收线操作
+            if self.reel_key == "right_click":
+                mouse.click_right(0.02)
+            else:
+                self.input_handler.press(self.reel_key, tm=0.02)
             
             # 检查面积是否大于阈值
             with self.lock:
                 current_area = self.current_area
-                
-                # 如果面积大于阈值，立即进入收线阶段
                 if current_area > threshold:
                     print(f"交替按键过程中检测到面积大于阈值: {current_area} > {threshold}，立即进入收线阶段")
                     self.reeling = True
                     return
             
+            # 按D键
             self.input_handler.press('d', tm=0.08)
-            
+            # 同时进行收线操作
+            if self.reel_key == "right_click":
+                mouse.click_right(0.02)
+            else:
+                self.input_handler.press(self.reel_key, tm=0.02)
+        
             # 再次检查面积是否大于阈值
             with self.lock:
                 current_area = self.current_area
-                
-                # 如果面积大于阈值，立即进入收线阶段
                 if current_area > threshold:
                     print(f"交替按键过程中检测到面积大于阈值: {current_area} > {threshold}，立即进入收线阶段")
                     self.reeling = True
                     return
-    
+                        
     def _fishing_loop(self):
         """钓鱼主循环"""
         print("进入钓鱼主循环")
