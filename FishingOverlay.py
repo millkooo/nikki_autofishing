@@ -6,7 +6,7 @@ import random
 
 from PyQt5.QtCore import Qt, pyqtSignal
 from PyQt5.QtGui import QPainter, QColor
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QProgressBar, QCheckBox, QComboBox
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QProgressBar, QCheckBox, QComboBox, QSlider
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Ui_Manage.TransparentOverlay import TransparentOverlay
@@ -32,6 +32,7 @@ class FishingOverlay(TransparentOverlay):
     stop_signal = pyqtSignal()
     fishing_mode_changed = pyqtSignal(int)  # 新增信号，用于通知钓鱼模式变更
     show_region_signal = pyqtSignal(bool)  # True表示显示区域，False表示隐藏区域
+    scale_changed_signal = pyqtSignal(float)  # 新增信号，用于通知UI缩放比例变更
     
     def __init__(self, target_config=None, parent=None):
         """初始化钓鱼透明窗口
@@ -70,6 +71,12 @@ class FishingOverlay(TransparentOverlay):
         self.show_region = False
         self.title_click_count = 0  # 添加标题点击计数器
         self.start_click_count = 0  # 添加开始按钮点击计数器
+        
+        # 缩放相关变量
+        self.scale_factor = 1.0  # 初始缩放比例为1.0
+        self.min_scale = 0.5    # 最小缩放比例
+        self.max_scale = 2.0    # 最大缩放比例
+        self.original_size = (300, 400)  # 原始窗口大小
         
         self.init_ui()
         
@@ -239,6 +246,85 @@ class FishingOverlay(TransparentOverlay):
         
         self.layout.addLayout(self.button_layout)
         
+        # 添加缩放控制布局
+        self.scale_layout = QHBoxLayout()
+        
+        # 缩小按钮
+        self.zoom_out_button = QPushButton("-")
+        self.zoom_out_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(50, 50, 150, 200);
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+                font-weight: bold;
+                min-width: 30px;
+            }
+            QPushButton:hover {
+                background-color: rgba(70, 70, 180, 220);
+            }
+            QPushButton:pressed {
+                background-color: rgba(30, 30, 120, 200);
+            }
+        """)
+        self.zoom_out_button.clicked.connect(self.on_zoom_out_clicked)
+        self.scale_layout.addWidget(self.zoom_out_button)
+        
+        # 缩放滑块
+        self.scale_slider = QSlider(Qt.Horizontal)
+        self.scale_slider.setRange(int(self.min_scale * 100), int(self.max_scale * 100))
+        self.scale_slider.setValue(int(self.scale_factor * 100))
+        self.scale_slider.setStyleSheet("""
+            QSlider {
+                background-color: transparent;
+            }
+            QSlider::groove:horizontal {
+                background-color: rgba(50, 50, 50, 150);
+                height: 8px;
+                border-radius: 4px;
+            }
+            QSlider::handle:horizontal {
+                background-color: rgba(0, 150, 255, 200);
+                width: 16px;
+                margin: -4px 0;
+                border-radius: 8px;
+            }
+            QSlider::handle:horizontal:hover {
+                background-color: rgba(0, 180, 255, 220);
+            }
+        """)
+        self.scale_slider.valueChanged.connect(self.on_scale_slider_changed)
+        self.scale_layout.addWidget(self.scale_slider)
+        
+        # 放大按钮
+        self.zoom_in_button = QPushButton("+")
+        self.zoom_in_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(50, 50, 150, 200);
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+                font-weight: bold;
+                min-width: 30px;
+            }
+            QPushButton:hover {
+                background-color: rgba(70, 70, 180, 220);
+            }
+            QPushButton:pressed {
+                background-color: rgba(30, 30, 120, 200);
+            }
+        """)
+        self.zoom_in_button.clicked.connect(self.on_zoom_in_clicked)
+        self.scale_layout.addWidget(self.zoom_in_button)
+        
+        # 缩放比例标签
+        self.scale_label = QLabel(f"{int(self.scale_factor * 100)}%")
+        self.scale_label.setStyleSheet("color: white; font-size: 12px;")
+        self.scale_label.setAlignment(Qt.AlignCenter)
+        self.scale_layout.addWidget(self.scale_label)
+        
+        self.layout.addLayout(self.scale_layout)
+        
         # 信息标签
         random_story = random.choice(self.stories)
         formatted_story = self.format_story(random_story)
@@ -265,6 +351,7 @@ class FishingOverlay(TransparentOverlay):
         
         # 设置窗口大小和位置
         self.setGeometry(1550, 250, 300, 400)  # 增加高度以适应新添加的控件
+        self.original_size = (300, 400)  # 保存原始大小
         
     def paintEvent(self, event):
         """绘制事件，自定义窗口外观"""
@@ -403,5 +490,107 @@ class FishingOverlay(TransparentOverlay):
             self.add_log("显示检测区域")
         else:
             self.add_log("隐藏检测区域")
+            
+    def on_zoom_in_clicked(self):
+        """放大按钮点击事件"""
+        new_scale = min(self.scale_factor + 0.1, self.max_scale)
+        self.set_scale(new_scale)
+        
+    def on_zoom_out_clicked(self):
+        """缩小按钮点击事件"""
+        new_scale = max(self.scale_factor - 0.1, self.min_scale)
+        self.set_scale(new_scale)
+        
+    def on_scale_slider_changed(self, value):
+        """缩放滑块值变更事件"""
+        new_scale = value / 100.0
+        self.set_scale(new_scale, update_slider=False)
+        
+    def set_scale(self, scale, update_slider=True):
+        """设置UI缩放比例
+        
+        Args:
+            scale: 缩放比例
+            update_slider: 是否更新滑块位置
+        """
+        if scale == self.scale_factor:
+            return
+            
+        self.scale_factor = scale
+        
+        # 更新缩放比例标签
+        self.scale_label.setText(f"{int(self.scale_factor * 100)}%")
+        
+        # 更新滑块位置（如果需要）
+        if update_slider:
+            self.scale_slider.setValue(int(self.scale_factor * 100))
+        
+        # 计算新的窗口大小
+        new_width = int(self.original_size[0] * self.scale_factor)
+        new_height = int(self.original_size[1] * self.scale_factor)
+        
+        # 获取当前窗口位置
+        current_pos = self.pos()
+        
+        # 调整窗口大小，保持位置不变
+        self.setGeometry(current_pos.x(), current_pos.y(), new_width, new_height)
+        
+        # 调整字体大小
+        self.update_font_sizes()
+        
+        # 发送缩放变更信号
+        self.scale_changed_signal.emit(self.scale_factor)
+        
+        self.add_log(f"UI缩放比例已调整为: {int(self.scale_factor * 100)}%")
+        
+    def update_font_sizes(self):
+        """根据缩放比例更新字体大小"""
+        # 标题标签
+        title_style = self.title_label.styleSheet()
+        title_style = self.update_font_size_in_style(title_style, 18)
+        self.title_label.setStyleSheet(title_style)
+        
+        # 状态标签
+        status_style = self.status_label.styleSheet()
+        status_style = self.update_font_size_in_style(status_style, 14)
+        self.status_label.setStyleSheet(status_style)
+        
+        # 模式标签
+        mode_style = self.mode_label.styleSheet()
+        mode_style = self.update_font_size_in_style(mode_style, 14)
+        self.mode_label.setStyleSheet(mode_style)
+        
+        # 信息标签
+        info_style = self.info_label.styleSheet()
+        info_style = self.update_font_size_in_style(info_style, 16)
+        self.info_label.setStyleSheet(info_style)
+        
+        # 日志标签
+        log_style = self.log_label.styleSheet()
+        log_style = self.update_font_size_in_style(log_style, 12)
+        self.log_label.setStyleSheet(log_style)
+        
+    def update_font_size_in_style(self, style, base_size):
+        """在样式表中更新字体大小
+        
+        Args:
+            style: 原始样式表
+            base_size: 基础字体大小
+            
+        Returns:
+            更新后的样式表
+        """
+        import re
+        # 计算新的字体大小
+        new_size = int(base_size * self.scale_factor)
+        
+        # 使用正则表达式替换字体大小
+        pattern = r'font-size:\s*\d+px'
+        replacement = f'font-size: {new_size}px'
+        
+        if re.search(pattern, style):
+            return re.sub(pattern, replacement, style)
+        else:
+            return style
 
 

@@ -340,9 +340,7 @@ class AutoFishing:
             if not self.reeling:
                 # 尝试按A键，看面积是否减少
                 print("尝试按A键")
-                self.input_handler.press('a', tm=0.5)
-                time.sleep(0.1)  # 给监控线程时间更新面积
-                
+                self.input_handler.press('a', tm=0.5)             
                 with self.lock:
                     new_area = self.current_area
                 area_change = current - new_area
@@ -357,7 +355,6 @@ class AutoFishing:
                 else:  # 尝试D键
                     print("尝试按D键")
                     self.input_handler.press('d', tm=0.5)
-                    time.sleep(0.1)  # 给监控线程时间更新面积
                     
                     with self.lock:
                         new_area = self.current_area
@@ -395,7 +392,7 @@ class AutoFishing:
                     
                     self.reeling_clicks += 1
                     print(f"---------正在收线 {self.reeling_clicks} 次 (键位: {self.reel_key})--------")
-                    time.sleep(0.03)
+                    time.sleep(0.04)
                 
                 # 检查是否需要重置
                 if self.reset_flag:
@@ -410,7 +407,7 @@ class AutoFishing:
                         print(f"收线完成，钓鱼结束 (用时: {reeling_duration:.1f}秒, 点击: {self.reeling_clicks}次, 面积: {self.current_area} < {reel_complete_threshold})")
                         self.fish_caught = True
                         # 收线完成后按F键拾取物品
-                        time.sleep(1)
+                        time.sleep(0.8)
                         self.input_handler.press("f")
                         # 重置收线状态
                         delattr(self, 'reeling_start_time')
@@ -425,7 +422,7 @@ class AutoFishing:
                         delattr(self, 'reeling_start_time')
                         delattr(self, 'reeling_clicks')
             
-            time.sleep(0.1)  # 控制循环速度
+            time.sleep(0.06)  # 控制循环速度
         
         # 钓鱼结束
         self.fishing = False
@@ -471,8 +468,8 @@ class AutoFishing:
                 # 面积没有减少，增加计数
                 no_decrease_count += 1
                 print(f"面积未减少，当前计数: {no_decrease_count}")
-                # 如果连续2次没有减少，认为已经不再减少
-                if no_decrease_count >= 2:
+                # 如果连续1次没有减少，认为已经不再减少
+                if no_decrease_count >= 1:
                     print(f"面积不再减少，停止按键")
                     return True
         
@@ -486,35 +483,36 @@ class AutoFishing:
     def _press_alternating_keys(self, duration):
         """交替按A和D键指定时间"""
         start_time = time.time()
-        initial_area = 0
         
-        # 获取初始面积
-        with self.lock:
-            initial_area = self.current_area
+        # 使用鱼上钩时记录的初始面积，而不是当前面积
+        initial_area = self.initial_area
+        
+        # 计算阈值：初始面积的八分之一
+        threshold = initial_area / 9
+        print(f"交替按键阈值设置为初始面积的就分之一: {threshold} (初始面积: {initial_area})")
         
         while time.time() - start_time < duration and not self.stop_flag and not self.reset_flag:
-            self.input_handler.press('a', tm=0.1)
+            self.input_handler.press('a', tm=0.08)
             
-            # 检查面积是否增加
+            # 检查面积是否大于阈值
             with self.lock:
                 current_area = self.current_area
-                area_increase_threshold = self._get_scaled_threshold("area_decrease")  # 复用减少阈值作为增加阈值
                 
-                # 如果面积明显增加，立即进入收线阶段
-                if current_area > initial_area + area_increase_threshold:
-                    print(f"交替按键过程中检测到面积增加: {current_area} > {initial_area + area_increase_threshold}，立即进入收线阶段")
+                # 如果面积大于阈值，立即进入收线阶段
+                if current_area > threshold:
+                    print(f"交替按键过程中检测到面积大于阈值: {current_area} > {threshold}，立即进入收线阶段")
                     self.reeling = True
                     return
             
-            self.input_handler.press('d', tm=0.1)
+            self.input_handler.press('d', tm=0.08)
             
-            # 再次检查面积是否增加
+            # 再次检查面积是否大于阈值
             with self.lock:
                 current_area = self.current_area
                 
-                # 如果面积明显增加，立即进入收线阶段
-                if current_area > initial_area + area_increase_threshold:
-                    print(f"交替按键过程中检测到面积增加: {current_area} > {initial_area + area_increase_threshold}，立即进入收线阶段")
+                # 如果面积大于阈值，立即进入收线阶段
+                if current_area > threshold:
+                    print(f"交替按键过程中检测到面积大于阈值: {current_area} > {threshold}，立即进入收线阶段")
                     self.reeling = True
                     return
     

@@ -31,9 +31,9 @@
             "near_zero_1_comment": "判断面积接近0的阈值1（用于判断是否进入收线阶段）",
             "near_zero_2": 20,
             "near_zero_2_comment": "判断面积接近0的阈值2（用于判断是否需要切换按键）",
-            "area_decrease": 20,
+            "area_decrease": 15,
             "area_decrease_comment": "判定面积有效减少的最小变化量",
-            "reel_complete": 40,
+            "reel_complete": 20,
             "reel_complete_comment": "判定收线完成的面积阈值",
             "area_ratio": 0.95,
             "area_ratio_comment": "判定需要继续拉鱼的面积比例（当前面积/初始面积）"
