@@ -432,6 +432,8 @@ def main():
     adapter.log_message.emit("钓鱼助手已启动")
     if hasattr(adapter, 'target_hwnd_valid') and adapter.target_hwnd_valid:
         adapter.log_message.emit("请点击'开始钓鱼'按钮开始")
+        # 提示用户可以展开更多选项
+        adapter.log_message.emit("点击'展开更多选项'查看日志和其他功能")
     else:
         adapter.log_message.emit("错误: 未找到游戏窗口，请先启动游戏")
     

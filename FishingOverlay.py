@@ -4,9 +4,9 @@ import sys
 import json
 import random
 
-from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QPainter, QColor
-from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QProgressBar, QCheckBox, QComboBox, QSlider
+from PyQt5.QtCore import Qt, pyqtSignal, QTimer
+from PyQt5.QtGui import QPainter, QColor, QIcon
+from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QPushButton, QHBoxLayout, QProgressBar, QCheckBox, QComboBox, QSlider, QFrame
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from Ui_Manage.TransparentOverlay import TransparentOverlay
@@ -46,7 +46,11 @@ class FishingOverlay(TransparentOverlay):
         self.scale_factor = 1.0  # 初始缩放比例为1.0
         self.min_scale = 0.5    # 最小缩放比例
         self.max_scale = 2.0    # 最大缩放比例
-        self.original_size = (300, 400)  # 原始窗口大小
+        self.original_size = (300, 220)  # 进一步减小原始窗口大小
+        
+        # 添加折叠状态变量
+        self.is_expanded = False  # 初始状态为折叠
+        self.is_adjusting = False  # 是否正在调整UI
         
         # 加载小姚故事集
         try:
@@ -114,20 +118,24 @@ class FishingOverlay(TransparentOverlay):
         # 创建主布局
         self.layout = QVBoxLayout(self.central_widget)
         self.layout.setContentsMargins(10, 10, 10, 10)  # 设置边距
+        self.layout.setSpacing(5)  # 减小控件间距
 
         # 标题标签
         self.title_label = QLabel("自动钓鱼助手")
         self.title_label.setStyleSheet("color: white; font-size: 18px; font-weight: bold; background-color: rgba(0, 0, 0, 150); padding: 5px;")
         self.title_label.setAlignment(Qt.AlignCenter)
+        self.title_label.setFixedHeight(35)  # 固定标题高度
         self.layout.addWidget(self.title_label)
         
         # 状态标签
         self.status_label = QLabel("状态: 等待开始")
         self.status_label.setStyleSheet("color: white; font-size: 14px; background-color: rgba(0, 0, 0, 100); padding: 5px;")
+        self.status_label.setFixedHeight(30)  # 固定状态标签高度
         self.layout.addWidget(self.status_label)
         
         # 钓鱼模式选择
         self.mode_layout = QHBoxLayout()
+        self.mode_layout.setSpacing(5)  # 减小控件间距
         self.mode_label = QLabel("钓鱼模式:")
         self.mode_label.setStyleSheet("color: white; font-size: 14px;")
         self.mode_layout.addWidget(self.mode_label)
@@ -174,10 +182,12 @@ class FishingOverlay(TransparentOverlay):
                 border-radius: 5px;
             }
         """)
+        self.progress_bar.setFixedHeight(20)  # 固定进度条高度
         self.layout.addWidget(self.progress_bar)
         
         # 按钮布局
         self.button_layout = QHBoxLayout()
+        self.button_layout.setSpacing(5)  # 减小控件间距
         
         # 开始按钮
         self.start_button = QPushButton("开始钓鱼")
@@ -247,8 +257,43 @@ class FishingOverlay(TransparentOverlay):
         
         self.layout.addLayout(self.button_layout)
         
+        # 添加折叠/展开按钮
+        self.toggle_button = QPushButton("▼ 展开更多选项")
+        self.toggle_button.setStyleSheet("""
+            QPushButton {
+                background-color: rgba(50, 50, 150, 200);
+                color: white;
+                border-radius: 5px;
+                padding: 5px;
+                font-weight: bold;
+                text-align: center;
+            }
+            QPushButton:hover {
+                background-color: rgba(70, 70, 180, 220);
+            }
+            QPushButton:pressed {
+                background-color: rgba(30, 30, 120, 200);
+            }
+        """)
+        self.toggle_button.setFixedHeight(30)  # 固定按钮高度
+        self.toggle_button.clicked.connect(self.toggle_expanded_sections)
+        self.layout.addWidget(self.toggle_button)
+        
+        # 创建可折叠的容器
+        self.collapsible_container = QFrame()
+        self.collapsible_layout = QVBoxLayout(self.collapsible_container)
+        self.collapsible_layout.setContentsMargins(0, 0, 0, 0)
+        self.collapsible_layout.setSpacing(5)  # 减小控件间距
+        self.collapsible_container.setVisible(False)  # 初始状态为隐藏
+        
         # 添加缩放控制布局
         self.scale_layout = QHBoxLayout()
+        
+        # 添加缩放标题
+        self.scale_title = QLabel("UI缩放控制")
+        self.scale_title.setStyleSheet("color: white; font-size: 14px; font-weight: bold; background-color: rgba(0, 0, 0, 100); padding: 5px;")
+        self.scale_title.setAlignment(Qt.AlignCenter)
+        self.collapsible_layout.addWidget(self.scale_title)
         
         # 缩小按钮
         self.zoom_out_button = QPushButton("-")
@@ -324,7 +369,7 @@ class FishingOverlay(TransparentOverlay):
         self.scale_label.setAlignment(Qt.AlignCenter)
         self.scale_layout.addWidget(self.scale_label)
         
-        self.layout.addLayout(self.scale_layout)
+        self.collapsible_layout.addLayout(self.scale_layout)
         
         # 信息标签
         random_story = random.choice(self.stories)
@@ -340,18 +385,77 @@ class FishingOverlay(TransparentOverlay):
             }
         """)
         self.info_label.setFixedHeight(100)  # 保持三行高度
-        self.layout.addWidget(self.info_label)
+        self.collapsible_layout.addWidget(self.info_label)
+        
+        # 日志标题
+        self.log_title = QLabel("日志记录")
+        self.log_title.setStyleSheet("color: white; font-size: 14px; font-weight: bold; background-color: rgba(0, 0, 0, 100); padding: 5px;")
+        self.log_title.setAlignment(Qt.AlignCenter)
+        self.collapsible_layout.addWidget(self.log_title)
         
         # 日志区域
-        self.log_label = QLabel("日志记录:\n等待操作...")
+        self.log_label = QLabel("等待操作...")
         self.log_label.setStyleSheet("color: white; font-size: 12px; background-color: rgba(0, 0, 0, 100); padding: 5px;")
         self.log_label.setAlignment(Qt.AlignLeft | Qt.AlignTop)
         self.log_label.setWordWrap(True)
         self.log_label.setMinimumHeight(100)
-        self.layout.addWidget(self.log_label)
+        self.collapsible_layout.addWidget(self.log_label)
+        
+        # 将可折叠容器添加到主布局
+        self.layout.addWidget(self.collapsible_container)
         
         # 设置窗口大小和位置
-        self.setGeometry(1550, 250, 300, 400)  # 增加高度以适应新添加的控件
+        self.setGeometry(1550, 250, 300, 220)  # 进一步减小初始窗口高度
+        
+    def toggle_expanded_sections(self):
+        """切换折叠/展开状态"""
+        # 如果正在调整UI，忽略此次点击
+        if self.is_adjusting:
+            return
+            
+        self.is_adjusting = True
+        self.is_expanded = not self.is_expanded
+        
+        # 更新按钮文本
+        if self.is_expanded:
+            self.toggle_button.setText("▲ 收起选项")
+            # 展开状态 - 先调整窗口大小，再显示容器
+            current_geometry = self.geometry()
+            self.setGeometry(current_geometry.x(), current_geometry.y(), 
+                            current_geometry.width(), 600)
+            # 延迟显示容器，确保窗口大小已调整
+            QTimer.singleShot(50, self.show_expanded_container)
+        else:
+            self.toggle_button.setText("▼ 展开更多选项")
+            # 折叠状态 - 先隐藏容器，再调整窗口大小
+            self.collapsible_container.setVisible(False)
+            # 延迟调整窗口大小，确保容器已隐藏
+            QTimer.singleShot(50, self.adjust_window_size_after_collapse)
+        
+        # 强制重绘窗口，确保边框正确显示
+        self.update()
+        
+    def show_expanded_container(self):
+        """显示展开的容器"""
+        self.collapsible_container.setVisible(True)
+        self.update()
+        # 完成UI调整
+        QTimer.singleShot(100, self.finish_adjustment)
+        
+    def adjust_window_size_after_collapse(self):
+        """收起后调整窗口大小"""
+        current_geometry = self.geometry()
+        self.setGeometry(current_geometry.x(), current_geometry.y(), 
+                        current_geometry.width(), 220)
+        # 再次强制重绘
+        self.update()
+        # 完成UI调整
+        QTimer.singleShot(100, self.finish_adjustment)
+        
+    def finish_adjustment(self):
+        """完成UI调整"""
+        self.is_adjusting = False
+        self.update()
         
     def paintEvent(self, event):
         """绘制事件，自定义窗口外观"""
@@ -425,11 +529,16 @@ class FishingOverlay(TransparentOverlay):
             message: 日志消息
         """
         current_text = self.log_label.text()
-        lines = current_text.split('\n')
+        
+        # 如果当前文本只有"等待操作..."，则替换它
+        if current_text == "等待操作...":
+            current_text = ""
+            
+        lines = current_text.split('\n') if current_text else []
         
         # 保持最多显示5行日志
-        if len(lines) > 6:  # 第一行是"日志记录:"
-            lines = lines[:1] + lines[-5:]
+        if len(lines) > 5:
+            lines = lines[-5:]
             
         # 添加新日志
         lines.append(message)
@@ -797,5 +906,11 @@ class FishingOverlay(TransparentOverlay):
                 return re.sub(pattern, f'min-width: {new_min_width}px', style)
         
         return style
+
+    def resizeEvent(self, event):
+        """窗口大小变化事件"""
+        super().resizeEvent(event)
+        # 强制重绘窗口，确保边框正确显示
+        self.update()
 
 
