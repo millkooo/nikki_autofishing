@@ -19,7 +19,7 @@ pip install -r requirements.txt
 3. 钓鱼配置部分用于调整钓鱼检测区域和判定阈值
 
 ### 运行方式
-1. 直接运行可执行文件（如果有打包版本）
+1. 解压压缩包并运行可执行文件（管理员模式）
 ```bash
 fishing_app.exe
 ```
