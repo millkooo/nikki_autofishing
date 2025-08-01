@@ -12,31 +12,13 @@
         "comment": "钓鱼相关配置",
         "reel_key": "right_click",
         "reel_key_comment": "收线阶段使用的键位，可以是键盘按键如'x'或'f'，或者'right_click'表示使用鼠标右键",
-        "region": {
-            "comment": "钓鱼进度条检测区域（基于1920x1080分辨率）",
-            "x_offset": 260,
-            "x_comment": "检测区域左边距",
-            "y_offset": 220,
-            "y_comment": "检测区域上边距",
-            "width": 1000,
-            "width_comment": "检测区域宽度",
-            "height": 400,
-            "height_comment": "检测区域高度"
-        },
         "thresholds": {
-            "comment": "钓鱼判定阈值（基于1920x1080分辨率）",
-            "fish_hook": 200,
-            "fish_hook_comment": "鱼上钩时的最小面积阈值",
-            "near_zero_1": 10,
-            "near_zero_1_comment": "判断面积接近0的阈值1（用于判断是否进入收线阶段）",
-            "near_zero_2": 20,
-            "near_zero_2_comment": "判断面积接近0的阈值2（用于判断是否需要切换按键）",
-            "area_decrease": 15,
-            "area_decrease_comment": "判定面积有效减少的最小变化量",
-            "reel_complete": 20,
-            "reel_complete_comment": "判定收线完成的面积阈值",
-            "area_ratio": 0.95,
-            "area_ratio_comment": "判定需要继续拉鱼的面积比例（当前面积/初始面积）"
+            "area_decrease": 4,
+            "area_decrease_comment": "判定面积有效减少的最小变化量"
+        },
+        "continuous": {
+            "unlimited": false,
+            "max_times": 3
         }
     }
 }

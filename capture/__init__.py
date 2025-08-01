@@ -3,7 +3,6 @@ import logging
 import time
 from ctypes import windll
 import cv2
-import mss
 import numpy as np
 import psutil
 import pythoncom

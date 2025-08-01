@@ -39,11 +39,24 @@ class InputHandler:
     def _on_key_press(self, key):
         """按键监听回调"""
         try:
+            # 支持自定义键位
+            key_char = None
+            if hasattr(key, 'char') and key.char:
+                key_char = key.char.lower()
+
+            # 处理F9键
             if key == Key.f9:
                 print("F9 已被按下，尝试停止运行")
                 self.stop_flag = True
+
+            # 暴露按键信息，便于外部处理（包括F9键）
+            if hasattr(self, 'external_on_key_press') and callable(self.external_on_key_press):
+                self.external_on_key_press(key, key_char)
+
         except AttributeError:
             pass
+        except Exception as e:
+            print(f"按键处理出错: {e}")
 
 
     def _get_vk_code(self, key):

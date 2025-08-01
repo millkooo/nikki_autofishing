@@ -146,13 +146,18 @@ class WinControl:
     @staticmethod
     def get_window_rect(hwnd: int) -> tuple:
         """获取窗口的位置和大小
-        
+
         Args:
             hwnd: 窗口句柄
-            
+
         Returns:
-            tuple: (x, y, width, height) 窗口的位置和大小
+            tuple: (x, y, width, height) 窗口的位置和大小，无效句柄返回None
         """
+        # 首先检查窗口句柄是否有效
+        if not hwnd or not WinControl.is_window_valid(hwnd):
+            logger.warning("无效的窗口句柄，使用默认位置")
+            return None
+
         try:
             # 获取窗口矩形
             rect = win32gui.GetWindowRect(hwnd)

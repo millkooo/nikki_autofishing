@@ -1,16 +1,19 @@
-# 图像处理相关
-opencv-python>=4.5.0
-numpy>=1.20.0
-mss>=6.1.0
-Pillow>=8.0.0
+# Core scientific computing
+numpy>=1.24.0,<2.0.0  # Keep below 2.0 to avoid breaking changes
 
-# 系统控制相关
-pywin32>=300
-pynput>=1.7.0
-psutil>=5.8.0
+# Computer vision and image processing
+opencv-python>=4.8.0
+pillow>=10.0.0
 
-# UI相关
-PyQt5>=5.15.0
+# Windows API and system utilities
+pywin32>=306
+psutil>=5.9.0
 
-# 其他工具
-pyinstaller>=4.5.0 
+# Input control
+pynput>=1.7.6
+
+# GUI framework
+PyQt5>=5.15.9
+
+# Build and packaging (for development)
+pyinstaller>=5.13.0

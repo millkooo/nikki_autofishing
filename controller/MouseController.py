@@ -7,44 +7,20 @@ from ctypes import wintypes
 import win32api
 import win32gui
 
+# 添加项目根目录到 Python 路径
+current_dir = os.path.dirname(os.path.abspath(__file__))
+root_dir = os.path.dirname(current_dir)
+if root_dir not in sys.path:
+    sys.path.insert(0, root_dir)
+
 from Ui_Manage.WindowManager import WinControl
 from config_manager import CONFIG
 
 
-def load_config():
-    """从JSON文件加载配置"""
-    try:
-        # 获取配置文件路径
-        try:
-            # PyInstaller创建临时文件夹,将路径存储在_MEIPASS中
-            base_path = sys._MEIPASS
-            config_path = os.path.join(base_path, 'config.json')
-        except Exception:
-            # 如果不是打包的情况,就使用当前文件的目录
-            base_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            config_path = os.path.join(base_path, 'config.json')
-
-        if not os.path.exists(config_path):
-            print(f"配置文件不存在: {config_path}")
-            sys.exit(1)
-
-        with open(config_path, 'r', encoding='utf-8') as f:
-            config = json.load(f)
-
-        print(f"成功加载配置文件: {config_path}")
-        return config
-    except Exception as e:
-        print(f"加载配置文件失败: {e}")
-        sys.exit(1)
-
-
-CONFIG = load_config()
-
-
 if ctypes.sizeof(ctypes.c_void_p) == 4:
-    ULONG_PTR = ctypes.c_ulong  # 32-bit
+    ULONG_PTR = ctypes.c_ulong  
 else:
-    ULONG_PTR = ctypes.c_ulonglong  # 64-bit
+    ULONG_PTR = ctypes.c_ulonglong  
 class MOUSEINPUT(ctypes.Structure):
     _fields_ = [
         ('dx', wintypes.LONG),
@@ -204,9 +180,20 @@ class MouseController:
         单击右键（含按住时间）
         :param duration: 按键保持时间（秒）
         """
-        self.press_right()
-        time.sleep(duration)
-        self.release_right()
+        # 优化右键点击效率
+        self._activate_window()
+        # 减少中间延迟提高响应速度
+        mi_down = MOUSEINPUT(0, 0, 0, self.MOUSEEVENTF_RIGHTDOWN, 0, 0)
+        input_down = INPUT(self.INPUT_MOUSE, mi_down)
+        self.SendInput(1, ctypes.byref(input_down), ctypes.sizeof(INPUT))
+        
+        # 使用更精确的睡眠时间
+        if duration > 0:
+            time.sleep(duration)
+            
+        mi_up = MOUSEINPUT(0, 0, 0, self.MOUSEEVENTF_RIGHTUP, 0, 0)
+        input_up = INPUT(self.INPUT_MOUSE, mi_up)
+        self.SendInput(1, ctypes.byref(input_up), ctypes.sizeof(INPUT))
 
     def wheel(self, delta: int):
         """
@@ -222,18 +209,13 @@ class MouseController:
 
 # 初始化窗口管理器
 window_manager = WinControl()
-
-# 创建鼠标控制器
 mouse = MouseController(window_manager)
-
-#time.sleep(3)
-#mouse.press_right（）#按下右键
-#mouse.release_right()#释放右键
-#mouse.click_right(1)，#按住一秒后放开
-#mouse.click_left()
-#mouse.wheel(1)
-# 绝对移动
-#mouse.move_absolute(100, 100)  # 移动到窗口客户区(100,100)位置
-
-# 相对移动
-#mouse.move_relative(1118, 0)   # 4472 一圈  2236 半圈
+if __name__ == "__main__":
+    mouse.move_absolute(100, 100)
+    mouse.click_left()
+    time.sleep(1)
+    mouse.click_right()
+    time.sleep(1)
+    mouse.wheel(1)
+    time.sleep(1)
+ 
